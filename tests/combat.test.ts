@@ -4,7 +4,7 @@ import { DEFENDERS } from '../src/data/defenders';
 import { addEnemy, freezeWaves, newGame, run } from './helpers';
 
 describe('combat', () => {
-  it('an archer kills a water drop coming down its lane', () => {
+  it('an archer kills an orc coming down its lane', () => {
     const s = newGame();
     freezeWaves(s);
     s.passiveTimer = Infinity;
@@ -27,7 +27,7 @@ describe('combat', () => {
     expect(s.enemies[0].hp).toBe(50);
   });
 
-  it('a drop stops at a shieldbearer and chews on it', () => {
+  it('an orc stops at a shieldbearer and hits it', () => {
     const s = newGame();
     freezeWaves(s);
     placeDefender(s, 'shieldbearer', 3, 2);
@@ -40,7 +40,7 @@ describe('combat', () => {
     expect(shield.hp).toBeGreaterThan(DEFENDERS.shieldbearer.hp - 50);
   });
 
-  it('arrows hit the first drop on the lane', () => {
+  it('arrows hit the first orc on the lane', () => {
     const s = newGame();
     freezeWaves(s);
     placeDefender(s, 'archer', 0, 0);

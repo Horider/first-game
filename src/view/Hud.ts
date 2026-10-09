@@ -8,6 +8,9 @@ import { COLORS } from './textures';
 
 const CARD = { x: 4, y: 2, w: 20, h: 24, gap: 2 };
 
+export const SPEEDS = [1, 2, 3] as const;
+const BUTTON = { x: 95, y: 9, size: 10, gap: 1 };
+
 interface CardView {
   type: DefenderType;
   frame: Phaser.GameObjects.Graphics;
@@ -16,12 +19,13 @@ interface CardView {
   shade: Phaser.GameObjects.Rectangle;
 }
 
-/** Top panel: defender cards, coin counter, hearts and the pause button. */
+/** Top panel: defender cards, coin counter, pause and speed buttons, hearts. */
 export class Hud {
   private cards: CardView[] = [];
   private coinText: PixelText;
   private hearts: Phaser.GameObjects.Image[] = [];
   private pauseButton: Phaser.GameObjects.Image;
+  private speedButtons: { speed: number; frame: Phaser.GameObjects.Graphics; x: number }[] = [];
   private banner: PixelText;
   private lastCoins = -1;
   selected: DefenderType | null = null;
@@ -30,6 +34,7 @@ export class Hud {
     private scene: Phaser.Scene,
     onCard: (type: DefenderType) => void,
     onPause: () => void,
+    onSpeed: (speed: number) => void,
   ) {
     scene.add.rectangle(0, 0, VIEW.width, VIEW.panelHeight, COLORS.panel).setOrigin(0);
 
@@ -45,13 +50,22 @@ export class Hud {
       this.cards.push({ type, frame, icon, price, shade });
     });
 
-    scene.add.image(54, 9, 'coin').setOrigin(0);
-    this.coinText = new PixelText(scene, 66, 10, '0', { color: COLORS.gold });
+    scene.add.image(50, 9, 'coin').setOrigin(0);
+    this.coinText = new PixelText(scene, 61, 10, '0', { color: COLORS.gold });
 
-    for (let i = 0; i < 3; i++) this.hearts.push(scene.add.image(138 + i * 12, 10, 'heart').setOrigin(0));
+    for (let i = 0; i < 3; i++) this.hearts.push(scene.add.image(141 + i * 11, 10, 'heart').setOrigin(0));
 
-    this.pauseButton = scene.add.image(117, 9, 'pause').setOrigin(0).setInteractive({ useHandCursor: true });
+    this.pauseButton = scene.add.image(BUTTON.x, BUTTON.y, 'pause').setOrigin(0).setInteractive({ useHandCursor: true });
     this.pauseButton.on('pointerdown', onPause);
+
+    SPEEDS.forEach((speed, i) => {
+      const x = BUTTON.x + (i + 1) * (BUTTON.size + BUTTON.gap);
+      const frame = scene.add.graphics();
+      tinyText(scene, x + 2, BUTTON.y + 3, `x${speed}`).setLetterSpacing(0);
+      scene.add.zone(x, BUTTON.y, BUTTON.size, BUTTON.size).setOrigin(0).setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => onSpeed(speed));
+      this.speedButtons.push({ speed, frame, x });
+    });
 
     this.banner = new PixelText(scene, VIEW.width / 2, VIEW.panelHeight + 40, '', {
       stroke: '#14141c',
@@ -63,7 +77,17 @@ export class Hud {
       .setVisible(false);
   }
 
-  sync(state: GameState) {
+  sync(state: GameState, speed: number) {
+    for (const b of this.speedButtons) {
+      const active = b.speed === speed;
+      b.frame
+        .clear()
+        .fillStyle(active ? COLORS.cardSelected : COLORS.cardBorder)
+        .fillRect(b.x, BUTTON.y, BUTTON.size, BUTTON.size)
+        .fillStyle(active ? 0x5a4a10 : COLORS.card)
+        .fillRect(b.x + 1, BUTTON.y + 1, BUTTON.size - 2, BUTTON.size - 2);
+    }
+
     for (const card of this.cards) {
       const def = DEFENDERS[card.type];
       const cooldown = state.cardCooldowns[card.type];

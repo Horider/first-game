@@ -12,7 +12,7 @@ export const LEVELS: LevelDef[] = [
   {
     id: 1,
     name: 'Озеро',
-    // Prototype: mud drops are replaced with water ones (concept: 10+1 mud, 15+3 mud).
-    waves: [{ water: 5 }, { water: 8 }, { water: 12 }, { water: 11 }, { water: 18, big: true }],
+    // Prototype: orcs with water-drop stats replace every drop (concept: 10+1 mud, 15+3 mud).
+    waves: [{ orc: 5 }, { orc: 8 }, { orc: 12 }, { orc: 11 }, { orc: 18, big: true }],
   },
 ];

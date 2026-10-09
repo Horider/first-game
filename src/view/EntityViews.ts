@@ -8,6 +8,11 @@ import { cellX, PURSE, rowY } from './layout';
 
 const DEPTH = { defender: 10, enemy: 20, arrow: 30, bars: 40, coin: 50 };
 
+type Visual = Phaser.GameObjects.Image | Phaser.GameObjects.Sprite;
+
+/** Enemies drawn with animated sheets from the asset pack (others are single images). */
+const ANIMATED = new Set(['orc']);
+
 /**
  * Keeps one sprite per defender, drop, arrow and coin in step with the game state.
  * Sprites are created on first sight and removed (or animated away) when the
@@ -15,7 +20,7 @@ const DEPTH = { defender: 10, enemy: 20, arrow: 30, bars: 40, coin: 50 };
  */
 export class EntityViews {
   private defenders = new Map<number, Phaser.GameObjects.Image>();
-  private enemies = new Map<number, Phaser.GameObjects.Image>();
+  private enemies = new Map<number, Visual>();
   private arrows = new Map<number, Phaser.GameObjects.Image>();
   private coins = new Map<number, Phaser.GameObjects.Image>();
   private flashUntil = new Map<number, number>();
@@ -87,16 +92,26 @@ export class EntityViews {
 
     for (const e of state.enemies) {
       seen.add(e.id);
+      const key = ENEMIES[e.type].sprite;
       let img = this.enemies.get(e.id);
       if (!img) {
-        img = this.scene.add.image(0, 0, ENEMIES[e.type].sprite).setOrigin(0.5, 1).setDepth(DEPTH.enemy + e.row);
+        img = ANIMATED.has(key)
+          ? this.scene.add.sprite(0, 0, `${key}-walk`).setOrigin(0.4, 0.64)
+          : this.scene.add.image(0, 0, key).setOrigin(0.5, 1);
+        img.setDepth(DEPTH.enemy + e.row);
         this.enemies.set(e.id, img);
       }
-      // Walking drops hop a pixel; chewing drops squash and stretch.
-      const phase = Math.floor(time / 200 + e.id) % 2;
-      const bob = e.state === 'walk' ? phase : 0;
-      img.setScale(e.state === 'attack' && phase ? 1.12 : 1, e.state === 'attack' && phase ? 0.88 : 1);
-      img.setPosition(Math.round(cellX(e.x)) + 8, rowY(e.row) + 16 - bob);
+      if (img instanceof Phaser.GameObjects.Sprite) {
+        // The pack's sheets: walk while moving, swing the axe while blocked.
+        img.play(`${key}-${e.state === 'attack' ? 'attack' : 'walk'}`, true);
+        img.setPosition(Math.round(cellX(e.x)) + 8, rowY(e.row) + 15);
+      } else {
+        // Walking drops hop a pixel; chewing drops squash and stretch.
+        const phase = Math.floor(time / 200 + e.id) % 2;
+        const bob = e.state === 'walk' ? phase : 0;
+        img.setScale(e.state === 'attack' && phase ? 1.12 : 1, e.state === 'attack' && phase ? 0.88 : 1);
+        img.setPosition(Math.round(cellX(e.x)) + 8, rowY(e.row) + 16 - bob);
+      }
       // Fade in while leaving the portal.
       img.setAlpha(Math.min(1, Math.max(0.3, (9.6 - e.x) / 0.6)));
     }
@@ -149,7 +164,7 @@ export class EntityViews {
     for (const e of state.enemies) bar(Math.round(cellX(e.x)) + 8, rowY(e.row), e.hp, e.maxHp, 0xff5a5a);
   }
 
-  private flash(img: Phaser.GameObjects.Image | undefined, id: number, seconds: number, minGap = 0) {
+  private flash(img: Visual | undefined, id: number, seconds: number, minGap = 0) {
     if (!img) return;
     const now = this.scene.time.now;
     const until = this.flashUntil.get(id) ?? 0;
@@ -167,10 +182,18 @@ export class EntityViews {
     }
   }
 
-  private vanish(map: Map<number, Phaser.GameObjects.Image>, id: number) {
+  private vanish(map: Map<number, Visual>, id: number) {
     const img = map.get(id);
     if (!img) return;
     map.delete(id);
+    if (img instanceof Phaser.GameObjects.Sprite) {
+      const key = img.anims.currentAnim?.key.split('-')[0];
+      img.clearTint().setAlpha(1).play(`${key}-death`);
+      img.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+        this.scene.tweens.add({ targets: img, alpha: 0, delay: 200, duration: 300, onComplete: () => img.destroy() });
+      });
+      return;
+    }
     img.setTintFill(0xffffff);
     this.scene.tweens.add({
       targets: img,
@@ -182,7 +205,7 @@ export class EntityViews {
     });
   }
 
-  private prune(map: Map<number, Phaser.GameObjects.Image>, seen: Set<number>) {
+  private prune(map: Map<number, Visual>, seen: Set<number>) {
     for (const [id, img] of map) {
       if (seen.has(id)) continue;
       img.destroy();

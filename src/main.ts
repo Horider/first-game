@@ -18,9 +18,13 @@ const game = new Phaser.Game({
   scene: [BootScene, GameScene, ResultScene],
 });
 
-/** Largest whole-number zoom that fits the window, so every pixel stays square and sharp. */
+/**
+ * Whole-number zoom so every pixel stays square and sharp. On big screens the game
+ * takes about 70% of the window instead of filling it; small phones get the largest fit.
+ */
 function fitZoom() {
-  const zoom = Math.max(1, Math.floor(Math.min(window.innerWidth / VIEW.width, window.innerHeight / VIEW.height)));
+  const fit = (share: number) => Math.floor(Math.min((window.innerWidth * share) / VIEW.width, (window.innerHeight * share) / VIEW.height));
+  const zoom = Math.max(1, fit(0.7) >= 3 ? fit(0.7) : fit(1));
   game.scale.setZoom(zoom);
 }
 window.addEventListener('resize', fitZoom);

@@ -8,8 +8,8 @@ import { LEVELS } from '../src/data/levels';
 import { addEnemy, freezeWaves, newGame, run } from './helpers';
 
 describe('waves', () => {
-  it('level 1 releases 5, 8, 12, 11 and 18 water drops', () => {
-    expect(LEVELS[0].waves.map((w) => w.water)).toEqual([5, 8, 12, 11, 18]);
+  it('level 1 releases 5, 8, 12, 11 and 18 orcs', () => {
+    expect(LEVELS[0].waves.map((w) => w.orc)).toEqual([5, 8, 12, 11, 18]);
     const s = newGame(7);
     s.hearts = 1000; // let everything walk through
     const perWave: number[] = [];

@@ -42,6 +42,7 @@ export class GameScene extends Phaser.Scene {
       this,
       (type) => this.selectCard(type),
       () => this.togglePause(),
+      (speed) => (this.speed = speed),
     );
 
     // The board itself: a click places the selected defender. Coins sit above it and win the click.
@@ -56,6 +57,9 @@ export class GameScene extends Phaser.Scene {
     const keys = this.input.keyboard!;
     keys.on('keydown-SPACE', () => this.togglePause());
     keys.on('keydown-ESC', () => this.selectCard(null));
+    keys.on('keydown-ONE', () => (this.speed = 1));
+    keys.on('keydown-TWO', () => (this.speed = 2));
+    keys.on('keydown-THREE', () => (this.speed = 3));
     if (DEBUG) this.setupDebug(keys);
 
     // Leaving the tab pauses the level so drops do not walk in while nobody is looking.
@@ -78,7 +82,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.handleEvents();
     this.views.sync(this.state, time);
-    this.hud.sync(this.state);
+    this.hud.sync(this.state, this.speed);
     if (this.debugText) {
       const w = this.state.wave;
       this.debugText.setText(`t${this.state.time.toFixed(0)} w${w.index + 1}/${this.state.level.waves.length} ${w.phase[0]} x${this.speed}`);
@@ -164,9 +168,6 @@ export class GameScene extends Phaser.Scene {
 
   private setupDebug(keys: Phaser.Input.Keyboard.KeyboardPlugin) {
     this.debugText = tinyText(this, VIEW.boardX + 1, VIEW.height - 6, '').setDepth(200);
-    keys.on('keydown-ONE', () => (this.speed = 1));
-    keys.on('keydown-TWO', () => (this.speed = 2));
-    keys.on('keydown-THREE', () => (this.speed = 4));
     keys.on('keydown-M', () => (this.state.coins += 1000));
     keys.on('keydown-N', () => {
       if (this.state.wave.phase === 'break') startWave(this.state);
