@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ECONOMY } from '../src/data/economy';
 import { STEP } from '../src/config';
 import { placeDefender, setPaused } from '../src/core/commands';
 import { tick } from '../src/core/Simulation';
@@ -8,8 +9,8 @@ import { LEVELS } from '../src/data/levels';
 import { addEnemy, freezeWaves, newGame, run } from './helpers';
 
 describe('waves', () => {
-  it('level 1 releases 5, 8, 12, 11 and 18 orcs', () => {
-    expect(LEVELS[0].waves.map((w) => w.orc)).toEqual([5, 8, 12, 11, 18]);
+  it('level 1 releases its waves in order, the last one big', () => {
+    const expected = LEVELS[0].waves.map((w) => Object.values(w).reduce<number>((n, v) => n + (typeof v === 'number' ? v : 0), 0));
     const s = newGame(7);
     s.hearts = 1000; // let everything walk through
     const perWave: number[] = [];
@@ -24,14 +25,14 @@ describe('waves', () => {
         if (ev.type === 'enemySpawned') perWave[perWave.length - 1]++;
       }
     }
-    expect(perWave).toEqual([5, 8, 12, 11, 18]);
+    expect(perWave).toEqual(expected);
     expect(big).toBe(true);
     expect(s.status).toBe('won');
   });
 
-  it('the first wave waits for the break', () => {
+  it('the first wave waits for the set-up time', () => {
     const s = newGame();
-    run(s, 9.9);
+    run(s, ECONOMY.firstWave - 0.1);
     expect(s.wave.phase).toBe('break');
     run(s, 0.2);
     expect(s.wave.phase).toBe('spawning');

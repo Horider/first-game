@@ -1,19 +1,25 @@
 import Phaser from 'phaser';
-import { DEBUG, STEP, VIEW } from '../config';
-import { canPlace, collectCoin, placeDefender, setPaused } from '../core/commands';
-import { createState, drainEvents, type GameState } from '../core/GameState';
+import { DEBUG, ROWS, STEP, VIEW } from '../config';
+import { canPlace, collectCoin, placeDefender, setPaused, upgradeDefender } from '../core/commands';
+import { createState, defenderAt, drainEvents, type GameState } from '../core/GameState';
 import { tick } from '../core/Simulation';
 import { startWave } from '../core/systems/waves';
 import { starsFor } from '../core/systems/outcome';
 import type { DefenderType } from '../data/defenders';
-import { LEVELS } from '../data/levels';
+import { LEVELS, type LevelDef } from '../data/levels';
+import { recordWin } from '../save/storage';
 import { tinyText } from '../ui/tinyFont';
 import { EntityViews } from '../view/EntityViews';
 import { Hud } from '../view/Hud';
 import { cellAt, cellX, rowY } from '../view/layout';
 
+export interface GameSceneData {
+  levelId?: number;
+}
+
 /** Runs one level: turns input into commands, ticks the simulation and keeps the views in sync. */
 export class GameScene extends Phaser.Scene {
+  private level!: LevelDef;
   private state!: GameState;
   private views!: EntityViews;
   private hud!: Hud;
@@ -27,19 +33,22 @@ export class GameScene extends Phaser.Scene {
     super('game');
   }
 
-  create() {
-    this.state = createState(LEVELS[0]);
+  create(data: GameSceneData) {
+    this.level = LEVELS.find((l) => l.id === data.levelId) ?? LEVELS[0];
+    this.state = createState(this.level);
     if (DEBUG) (window as unknown as { gameState: GameState }).gameState = this.state;
     this.accumulator = 0;
     this.speed = 1;
     this.finished = false;
 
     this.add.image(0, VIEW.panelHeight, 'board').setOrigin(0);
+    for (let row = 0; row < ROWS; row++) this.add.image(0, rowY(row), 'wall').setOrigin(0);
     this.cursor = this.add.rectangle(0, 0, VIEW.cell, VIEW.cell).setOrigin(0).setDepth(5).setVisible(false);
 
     this.views = new EntityViews(this, (id) => collectCoin(this.state, id));
     this.hud = new Hud(
       this,
+      `${this.level.id}. ${this.level.name}`,
       (type) => this.selectCard(type),
       () => this.togglePause(),
       (speed) => (this.speed = speed),
@@ -116,7 +125,9 @@ export class GameScene extends Phaser.Scene {
     this.selectCard(null);
     this.hud.hideBanner();
     this.time.delayedCall(600, () => {
-      this.scene.launch('result', { won: this.state.status === 'won', stars: this.state.stars });
+      const won = this.state.status === 'won';
+      if (won) recordWin(this.level.id, this.state.stars);
+      this.scene.launch('result', { won, stars: this.state.stars, levelId: this.level.id });
     });
   }
 
@@ -136,7 +147,13 @@ export class GameScene extends Phaser.Scene {
   private clickBoard(p: Phaser.Input.Pointer) {
     const type = this.hud.selected;
     const cell = cellAt(p.worldX, p.worldY);
-    if (!type || !cell) return;
+    if (!cell) return;
+    if (!type) {
+      // No card in hand: clicking a level-1 defender upgrades it.
+      const d = defenderAt(this.state, cell.row, cell.col);
+      if (d && upgradeDefender(this.state, d.id) === 'noCoins') this.cameras.main.shake(80, 0.005);
+      return;
+    }
     const result = placeDefender(this.state, type, cell.row, cell.col);
     if (result === 'ok') {
       this.hud.selected = null;
@@ -167,10 +184,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private setupDebug(keys: Phaser.Input.Keyboard.KeyboardPlugin) {
-    this.debugText = tinyText(this, VIEW.boardX + 1, VIEW.height - 6, '').setDepth(200);
+    this.debugText = tinyText(this, VIEW.boardX + 2, VIEW.height - 7, '').setDepth(200);
     keys.on('keydown-M', () => (this.state.coins += 1000));
     keys.on('keydown-N', () => {
       if (this.state.wave.phase === 'break') startWave(this.state);
+    });
+    keys.on('keydown-L', () => {
+      // Lose instantly, to check the defeat screen.
+      this.state.hearts = 0;
     });
     keys.on('keydown-W', () => {
       if (this.finished) return;

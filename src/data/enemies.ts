@@ -1,4 +1,4 @@
-export type EnemyType = 'orc' | 'water' | 'mud' | 'fire';
+export type EnemyType = 'slime' | 'bigSlime' | 'slimebody' | 'twins';
 
 export interface EnemyDef {
   name: string;
@@ -11,11 +11,10 @@ export interface EnemyDef {
   sprite: string;
 }
 
-// The prototype spawns only orcs (sprites from the Tiny RPG Character Asset Pack);
-// the drops from the concept stay here for later levels.
+/** Slimes from the 32rogues pack, weakest to strongest. */
 export const ENEMIES = {
-  orc: { name: 'Орк', hp: 50, dps: 10, speed: 0.4, reward: 10, sprite: 'orc' },
-  water: { name: 'Водяная капля', hp: 50, dps: 10, speed: 0.4, reward: 10, sprite: 'water' },
-  mud: { name: 'Грязевая капля', hp: 150, dps: 20, speed: 0.3, reward: 25, sprite: 'mud' },
-  fire: { name: 'Огненная капля', hp: 300, dps: 35, speed: 0.5, reward: 50, sprite: 'fire' },
+  slime: { name: 'Капелька', hp: 60, dps: 12, speed: 0.45, reward: 10, sprite: 'slime' },
+  bigSlime: { name: 'Большая капля', hp: 130, dps: 20, speed: 0.3, reward: 20, sprite: 'slime-big' },
+  slimebody: { name: 'Слизень', hp: 240, dps: 32, speed: 0.4, reward: 35, sprite: 'slimebody' },
+  twins: { name: 'Двойной слизень', hp: 480, dps: 50, speed: 0.25, reward: 60, sprite: 'slimebody-twins' },
 } satisfies Record<EnemyType, EnemyDef>;

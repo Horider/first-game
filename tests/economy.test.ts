@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { LEVELS } from '../src/data/levels';
+import { ENEMIES } from '../src/data/enemies';
 import { canPlace, collectCoin, placeDefender } from '../src/core/commands';
 import { DEFENDERS } from '../src/data/defenders';
 import { ECONOMY } from '../src/data/economy';
@@ -8,7 +10,7 @@ describe('placing defenders', () => {
   it('charges the price and starts the card cooldown', () => {
     const s = newGame();
     expect(placeDefender(s, 'archer', 0, 0)).toBe('ok');
-    expect(s.coins).toBe(ECONOMY.startCoins - DEFENDERS.archer.cost);
+    expect(s.coins).toBe(LEVELS[0].startCoins - DEFENDERS.archer.cost);
     expect(s.cardCooldowns.archer).toBe(DEFENDERS.archer.cooldown);
     expect(s.defenders).toHaveLength(1);
   });
@@ -64,13 +66,13 @@ describe('coins', () => {
     expect(s.drops).toHaveLength(1);
     run(s, 0.2);
     expect(s.drops).toHaveLength(0);
-    expect(s.coins).toBe(ECONOMY.startCoins + 10);
+    expect(s.coins).toBe(LEVELS[0].startCoins + ENEMIES.slime.reward);
   });
 
   it('pays passive income on a timer', () => {
     const s = newGame();
     freezeWaves(s);
     run(s, 3 * ECONOMY.passiveEvery + 0.05);
-    expect(s.coins).toBe(ECONOMY.startCoins + 3 * ECONOMY.passiveIncome);
+    expect(s.coins).toBe(LEVELS[0].startCoins + 3 * ECONOMY.passiveIncome);
   });
 });

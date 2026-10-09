@@ -15,7 +15,7 @@ export function run(state: GameState, seconds: number): void {
 }
 
 /** Drop an enemy onto the board directly, bypassing the wave timer. */
-export function addEnemy(state: GameState, row: number, x: number, type: EnemyType = 'orc') {
+export function addEnemy(state: GameState, row: number, x: number, type: EnemyType = 'slime') {
   const def = ENEMIES[type];
   const enemy = { id: state.nextId++, type, row, x, hp: def.hp, maxHp: def.hp, speed: def.speed, state: 'walk' as const };
   state.enemies.push(enemy);

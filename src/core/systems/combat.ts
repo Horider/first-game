@@ -13,11 +13,11 @@ function archerTarget(state: GameState, d: Defender): Enemy | undefined {
   return best;
 }
 
-/** Melee reach: the defender's own cell and `range` cells to the right. */
+/** Melee reach: its own cell and `range` cells to the right, so a swordsman hits over a shield. */
 function meleeTarget(state: GameState, d: Defender, range: number): Enemy | undefined {
   let best: Enemy | undefined;
   for (const e of state.enemies) {
-    if (e.row !== d.row || e.x >= d.col + 1 + range || e.x + 1 <= d.col) continue;
+    if (e.row !== d.row || e.x > d.col + 1 + range + 1e-6 || e.x + 1 <= d.col) continue;
     if (!best || e.x < best.x) best = e;
   }
   return best;

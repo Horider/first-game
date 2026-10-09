@@ -28,18 +28,10 @@ function rect(ctx: CanvasRenderingContext2D, color: string, x: number, y: number
   ctx.fillRect(x, y, w, h);
 }
 
-/** Wall, checkerboard lanes and portals in one 176×80 image. */
+/** Checkerboard lanes and portals in one image; the stone wall is drawn from the pack's tile. */
 function drawBoard(ctx: CanvasRenderingContext2D) {
   const { cell, boardX } = VIEW;
   const rand = mulberry32(3);
-
-  // Stone wall: two-tone bricks with offset rows.
-  rect(ctx, COLORS.stoneDark, 0, 0, boardX, ROWS * cell);
-  for (let y = 0; y < ROWS * cell; y += 4) {
-    const shift = (y / 4) % 2 === 0 ? 0 : 4;
-    // The canvas clips bricks at the left edge; grass drawn next covers the right one.
-    for (let x = -shift; x < boardX; x += 8) rect(ctx, COLORS.stone, x + 1, y + 1, 7, 3);
-  }
 
   for (let row = 0; row < ROWS; row++) {
     for (let col = 0; col < COLS; col++) {
@@ -49,26 +41,32 @@ function drawBoard(ctx: CanvasRenderingContext2D) {
       const ours = col < PLAYER_COLS;
       rect(ctx, ours ? (even ? COLORS.grassLight : COLORS.grassDark) : even ? COLORS.alienDark : COLORS.alienLight, x, y, cell, cell);
       const dot = ours ? COLORS.grassDot : COLORS.alienDot;
-      for (let i = 0; i < 3; i++) rect(ctx, dot, x + 1 + Math.floor(rand() * 14), y + 1 + Math.floor(rand() * 14), 1, 1);
+      for (let i = 0; i < 5; i++) {
+        const dx = 2 + Math.floor(rand() * 27);
+        const dy = 2 + Math.floor(rand() * 27);
+        rect(ctx, dot, x + dx, y + dy, 2, 1);
+        if (ours && i % 2 === 0) rect(ctx, dot, x + dx + 1, y + dy - 2, 1, 2); // a tuft of grass
+      }
     }
   }
 
   // The border between our grass and alien ground.
   rect(ctx, '#ffffff', boardX + PLAYER_COLS * cell, 0, 1, ROWS * cell);
 
-  // Portals: one purple ring per lane.
+  // Portals: one purple ring per lane, drawn on a 2× grid to match the 32 px sprites.
   const px = boardX + COLS * cell;
+  const p = (color: string, x: number, y: number, w: number, h: number) => rect(ctx, color, px + x * 2, y * 2, w * 2, h * 2);
   rect(ctx, COLORS.portalBg, px, 0, cell, ROWS * cell);
   for (let row = 0; row < ROWS; row++) {
-    const y = row * cell;
-    rect(ctx, COLORS.portalRing, px + 4, y + 1, 8, 14);
-    rect(ctx, COLORS.portalRing, px + 3, y + 3, 10, 10);
-    rect(ctx, COLORS.portalGlow, px + 5, y + 2, 6, 12);
-    rect(ctx, COLORS.portalGlow, px + 4, y + 4, 8, 8);
-    rect(ctx, COLORS.portalRing, px + 6, y + 3, 4, 10);
-    rect(ctx, COLORS.portalRing, px + 5, y + 5, 6, 6);
-    rect(ctx, COLORS.portalCore, px + 7, y + 4, 2, 8);
-    rect(ctx, COLORS.portalCore, px + 6, y + 6, 4, 4);
+    const y = row * 16;
+    p(COLORS.portalRing, 4, y + 1, 8, 14);
+    p(COLORS.portalRing, 3, y + 3, 10, 10);
+    p(COLORS.portalGlow, 5, y + 2, 6, 12);
+    p(COLORS.portalGlow, 4, y + 4, 8, 8);
+    p(COLORS.portalRing, 6, y + 3, 4, 10);
+    p(COLORS.portalRing, 5, y + 5, 6, 6);
+    p(COLORS.portalCore, 7, y + 4, 2, 8);
+    p(COLORS.portalCore, 6, y + 6, 4, 4);
   }
 }
 
@@ -94,11 +92,23 @@ const STAR = [
 export function createTextures(scene: Phaser.Scene) {
   canvasTexture(scene, 'board', VIEW.width, ROWS * VIEW.cell, drawBoard);
 
-  canvasTexture(scene, 'arrow', 7, 3, (ctx) => {
-    rect(ctx, '#8b5a2b', 1, 1, 5, 1);
-    rect(ctx, '#e0e0e0', 6, 1, 1, 1);
-    rect(ctx, '#e0e0e0', 0, 0, 1, 1);
-    rect(ctx, '#e0e0e0', 0, 2, 1, 1);
+  // Arrow in the pack's palette: green fletching, orange shaft, pale tip.
+  canvasTexture(scene, 'arrow', 12, 5, (ctx) => {
+    rect(ctx, '#e17b50', 2, 2, 8, 1);
+    rect(ctx, '#def9fc', 10, 1, 1, 3);
+    rect(ctx, '#def9fc', 11, 2, 1, 1);
+    rect(ctx, '#07bb79', 0, 0, 2, 1);
+    rect(ctx, '#07bb79', 0, 4, 2, 1);
+    rect(ctx, '#07bb79', 1, 1, 2, 1);
+    rect(ctx, '#07bb79', 1, 3, 2, 1);
+  });
+
+  // Level-up badge shown over defenders that can be upgraded.
+  canvasTexture(scene, 'upgrade', 7, 7, (ctx) => {
+    rect(ctx, '#1b0b0b', 0, 0, 7, 7);
+    rect(ctx, '#00ff8c', 3, 1, 1, 5);
+    rect(ctx, '#00ff8c', 2, 2, 3, 1);
+    rect(ctx, '#00ff8c', 1, 3, 5, 1);
   });
 
   for (const [key, color] of [['star', COLORS.gold], ['star-empty', '#3a3a4a']] as const) {
@@ -107,19 +117,13 @@ export function createTextures(scene: Phaser.Scene) {
     });
   }
 
-  canvasTexture(scene, 'pause', 10, 10, (ctx) => {
-    rect(ctx, '#55556e', 0, 0, 10, 10);
-    rect(ctx, '#2c2c3a', 1, 1, 8, 8);
-    rect(ctx, '#ffffff', 3, 3, 1, 4);
-    rect(ctx, '#ffffff', 6, 3, 1, 4);
+  canvasTexture(scene, 'pause', 8, 8, (ctx) => {
+    rect(ctx, '#ffffff', 1, 1, 2, 6);
+    rect(ctx, '#ffffff', 5, 1, 2, 6);
   });
 
-  canvasTexture(scene, 'play', 10, 10, (ctx) => {
-    rect(ctx, '#55556e', 0, 0, 10, 10);
-    rect(ctx, '#2c2c3a', 1, 1, 8, 8);
-    rect(ctx, '#ffffff', 4, 2, 1, 6);
-    rect(ctx, '#ffffff', 5, 3, 1, 4);
-    rect(ctx, '#ffffff', 6, 4, 1, 2);
+  canvasTexture(scene, 'play', 8, 8, (ctx) => {
+    for (let i = 0; i < 4; i++) rect(ctx, '#ffffff', 2 + i, 1 + i, 1, 6 - i * 2);
   });
 
   canvasTexture(scene, 'pixel', 1, 1, (ctx) => rect(ctx, '#ffffff', 0, 0, 1, 1));

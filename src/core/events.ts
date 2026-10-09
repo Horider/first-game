@@ -8,6 +8,7 @@ export type GameEvent =
   | { type: 'enemyKilled'; id: number; row: number; x: number }
   | { type: 'enemyHit'; id: number }
   | { type: 'defenderPlaced'; id: number; defender: DefenderType; row: number; col: number }
+  | { type: 'defenderUpgraded'; id: number; defender: DefenderType }
   | { type: 'defenderHit'; id: number }
   | { type: 'defenderDied'; id: number }
   | { type: 'arrowFired'; id: number; from: number }

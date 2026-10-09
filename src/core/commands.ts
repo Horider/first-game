@@ -26,6 +26,33 @@ export function placeDefender(state: GameState, type: DefenderType, row: number,
   return 'ok';
 }
 
+export type UpgradeResult = 'ok' | 'notPlaying' | 'missing' | 'maxLevel' | 'noCoins';
+
+export function canUpgrade(state: GameState, defenderId: number): UpgradeResult {
+  if (state.status !== 'playing') return 'notPlaying';
+  const d = state.defenders.find((x) => x.id === defenderId);
+  if (!d) return 'missing';
+  const upgrade = DEFENDERS[d.type].upgrade;
+  if (!upgrade) return 'maxLevel';
+  if (state.coins < upgrade.cost) return 'noCoins';
+  return 'ok';
+}
+
+/** Turn a placed level-1 defender into its level-2 version; health keeps its share of the maximum. */
+export function upgradeDefender(state: GameState, defenderId: number): UpgradeResult {
+  const result = canUpgrade(state, defenderId);
+  if (result !== 'ok') return result;
+  const d = state.defenders.find((x) => x.id === defenderId)!;
+  const upgrade = DEFENDERS[d.type].upgrade!;
+  const next = DEFENDERS[upgrade.to];
+  state.coins -= upgrade.cost;
+  d.hp = (d.hp / d.maxHp) * next.hp;
+  d.maxHp = next.hp;
+  d.type = upgrade.to;
+  emit(state, { type: 'defenderUpgraded', id: d.id, defender: d.type });
+  return 'ok';
+}
+
 export function collectCoin(state: GameState, dropId: number): boolean {
   if (state.status !== 'playing') return false;
   const index = state.drops.findIndex((d) => d.id === dropId);

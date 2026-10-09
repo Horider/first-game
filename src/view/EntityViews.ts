@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { DEBUG } from '../config';
+import { DEBUG, VIEW } from '../config';
+import { canUpgrade } from '../core/commands';
 import type { GameEvent } from '../core/events';
 import type { GameState } from '../core/GameState';
 import { DEFENDERS } from '../data/defenders';
@@ -7,20 +8,17 @@ import { ENEMIES } from '../data/enemies';
 import { cellX, PURSE, rowY } from './layout';
 
 const DEPTH = { defender: 10, enemy: 20, arrow: 30, bars: 40, coin: 50 };
-
-type Visual = Phaser.GameObjects.Image | Phaser.GameObjects.Sprite;
-
-/** Enemies drawn with animated sheets from the asset pack (others are single images). */
-const ANIMATED = new Set(['orc']);
+const HALF = VIEW.cell / 2;
 
 /**
- * Keeps one sprite per defender, drop, arrow and coin in step with the game state.
+ * Keeps one sprite per defender, slime, arrow and coin in step with the game state.
  * Sprites are created on first sight and removed (or animated away) when the
  * object leaves the state.
  */
 export class EntityViews {
   private defenders = new Map<number, Phaser.GameObjects.Image>();
-  private enemies = new Map<number, Visual>();
+  private badges = new Map<number, Phaser.GameObjects.Image>();
+  private enemies = new Map<number, Phaser.GameObjects.Image>();
   private arrows = new Map<number, Phaser.GameObjects.Image>();
   private coins = new Map<number, Phaser.GameObjects.Image>();
   private flashUntil = new Map<number, number>();
@@ -42,6 +40,13 @@ export class EntityViews {
         case 'defenderDied':
           this.vanish(this.defenders, ev.id);
           break;
+        case 'defenderUpgraded': {
+          const img = this.defenders.get(ev.id);
+          if (!img) break;
+          img.setTexture(DEFENDERS[ev.defender].sprite).setTintFill(0x00ff8c);
+          this.scene.tweens.add({ targets: img, scaleY: 1.25, duration: 120, yoyo: true, onComplete: () => img.clearTint() });
+          break;
+        }
         case 'enemyHit':
           this.flash(this.enemies.get(ev.id), ev.id, 0.08);
           break;
@@ -50,7 +55,7 @@ export class EntityViews {
           break;
         case 'arrowFired': {
           const archer = this.defenders.get(ev.from);
-          if (archer) this.scene.tweens.add({ targets: archer, scaleX: 0.85, duration: 60, yoyo: true });
+          if (archer) this.scene.tweens.add({ targets: archer, scaleX: 0.9, duration: 60, yoyo: true });
           break;
         }
         case 'coinCollected': {
@@ -86,32 +91,36 @@ export class EntityViews {
         this.scene.tweens.add({ targets: img, scaleY: 1, duration: 150, ease: 'Back.easeOut' });
         this.defenders.set(d.id, img);
       }
-      img.setPosition(cellX(d.col) + 8, rowY(d.row) + 16);
+      img.setPosition(cellX(d.col) + HALF, rowY(d.row) + VIEW.cell);
+
+      // A green arrow over level-1 defenders the player can afford to upgrade.
+      const upgradable = canUpgrade(state, d.id) === 'ok';
+      let badge = this.badges.get(d.id);
+      if (upgradable && !badge) {
+        badge = this.scene.add.image(0, 0, 'upgrade').setOrigin(0).setDepth(DEPTH.bars + 1);
+        this.badges.set(d.id, badge);
+      } else if (!upgradable && badge) {
+        badge.destroy();
+        this.badges.delete(d.id);
+        badge = undefined;
+      }
+      badge?.setPosition(cellX(d.col) + VIEW.cell - 8, rowY(d.row) + 1 - (Math.floor(time / 300) % 2));
     }
     this.prune(this.defenders, seen);
+    this.prune(this.badges, seen);
 
     for (const e of state.enemies) {
       seen.add(e.id);
-      const key = ENEMIES[e.type].sprite;
       let img = this.enemies.get(e.id);
       if (!img) {
-        img = ANIMATED.has(key)
-          ? this.scene.add.sprite(0, 0, `${key}-walk`).setOrigin(0.4, 0.64)
-          : this.scene.add.image(0, 0, key).setOrigin(0.5, 1);
-        img.setDepth(DEPTH.enemy + e.row);
+        img = this.scene.add.image(0, 0, ENEMIES[e.type].sprite).setOrigin(0.5, 1).setDepth(DEPTH.enemy + e.row);
         this.enemies.set(e.id, img);
       }
-      if (img instanceof Phaser.GameObjects.Sprite) {
-        // The pack's sheets: walk while moving, swing the axe while blocked.
-        img.play(`${key}-${e.state === 'attack' ? 'attack' : 'walk'}`, true);
-        img.setPosition(Math.round(cellX(e.x)) + 8, rowY(e.row) + 15);
-      } else {
-        // Walking drops hop a pixel; chewing drops squash and stretch.
-        const phase = Math.floor(time / 200 + e.id) % 2;
-        const bob = e.state === 'walk' ? phase : 0;
-        img.setScale(e.state === 'attack' && phase ? 1.12 : 1, e.state === 'attack' && phase ? 0.88 : 1);
-        img.setPosition(Math.round(cellX(e.x)) + 8, rowY(e.row) + 16 - bob);
-      }
+      // Walking slimes hop; chewing slimes squash and stretch.
+      const phase = Math.floor(time / 200 + e.id) % 2;
+      const bob = e.state === 'walk' ? phase * 2 : 0;
+      img.setScale(e.state === 'attack' && phase ? 1.1 : 1, e.state === 'attack' && phase ? 0.9 : 1);
+      img.setPosition(Math.round(cellX(e.x)) + HALF, rowY(e.row) + VIEW.cell - bob);
       // Fade in while leaving the portal.
       img.setAlpha(Math.min(1, Math.max(0.3, (9.6 - e.x) / 0.6)));
     }
@@ -124,7 +133,7 @@ export class EntityViews {
         img = this.scene.add.image(0, 0, 'arrow').setOrigin(0, 0.5).setDepth(DEPTH.arrow);
         this.arrows.set(p.id, img);
       }
-      img.setPosition(Math.round(cellX(p.x)), rowY(p.row) + 8);
+      img.setPosition(Math.round(cellX(p.x)), rowY(p.row) + 14);
     }
     this.prune(this.arrows, seen);
 
@@ -133,12 +142,12 @@ export class EntityViews {
       let img = this.coins.get(c.id);
       if (!img) {
         const x = Math.round(cellX(c.x));
-        const y = rowY(c.row) + 8;
-        img = this.scene.add.image(x, y, 'coin').setDepth(DEPTH.coin);
+        const y = rowY(c.row) + HALF;
+        img = this.scene.add.image(x, y, 'coin').setScale(2).setDepth(DEPTH.coin);
         // Generous hit box so the coin is easy to tap on a phone.
-        img.setInteractive(new Phaser.Geom.Rectangle(-4, -4, 18, 18), Phaser.Geom.Rectangle.Contains);
+        img.setInteractive(new Phaser.Geom.Rectangle(-6, -6, 18, 17), Phaser.Geom.Rectangle.Contains);
         img.on('pointerdown', () => this.onCoinClick(c.id));
-        this.scene.tweens.add({ targets: img, y: y - 6, duration: 150, yoyo: true, ease: 'Quad.easeOut' });
+        this.scene.tweens.add({ targets: img, y: y - 10, duration: 150, yoyo: true, ease: 'Quad.easeOut' });
         this.coins.set(c.id, img);
       }
       // Blink during the last second before it flies away on its own.
@@ -155,16 +164,16 @@ export class EntityViews {
     const g = this.bars.clear();
     const bar = (x: number, y: number, hp: number, max: number, color: number) => {
       if (hp >= max && !DEBUG) return;
-      const w = 10;
+      const w = 20;
       const fill = Math.max(1, Math.round((w * Math.max(0, hp)) / max));
-      g.fillStyle(0x14141c).fillRect(x - 6, y - 1, w + 2, 3);
-      g.fillStyle(color).fillRect(x - 5, y, fill, 1);
+      g.fillStyle(0x14141c).fillRect(x - w / 2 - 1, y - 1, w + 2, 4);
+      g.fillStyle(color).fillRect(x - w / 2, y, fill, 2);
     };
-    for (const d of state.defenders) bar(cellX(d.col) + 8, rowY(d.row), d.hp, d.maxHp, 0x5fe05a);
-    for (const e of state.enemies) bar(Math.round(cellX(e.x)) + 8, rowY(e.row), e.hp, e.maxHp, 0xff5a5a);
+    for (const d of state.defenders) bar(cellX(d.col) + HALF, rowY(d.row) + 1, d.hp, d.maxHp, 0x5fe05a);
+    for (const e of state.enemies) bar(Math.round(cellX(e.x)) + HALF, rowY(e.row) + 1, e.hp, e.maxHp, 0xff5a5a);
   }
 
-  private flash(img: Visual | undefined, id: number, seconds: number, minGap = 0) {
+  private flash(img: Phaser.GameObjects.Image | undefined, id: number, seconds: number, minGap = 0) {
     if (!img) return;
     const now = this.scene.time.now;
     const until = this.flashUntil.get(id) ?? 0;
@@ -182,18 +191,10 @@ export class EntityViews {
     }
   }
 
-  private vanish(map: Map<number, Visual>, id: number) {
+  private vanish(map: Map<number, Phaser.GameObjects.Image>, id: number) {
     const img = map.get(id);
     if (!img) return;
     map.delete(id);
-    if (img instanceof Phaser.GameObjects.Sprite) {
-      const key = img.anims.currentAnim?.key.split('-')[0];
-      img.clearTint().setAlpha(1).play(`${key}-death`);
-      img.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
-        this.scene.tweens.add({ targets: img, alpha: 0, delay: 200, duration: 300, onComplete: () => img.destroy() });
-      });
-      return;
-    }
     img.setTintFill(0xffffff);
     this.scene.tweens.add({
       targets: img,
@@ -205,7 +206,7 @@ export class EntityViews {
     });
   }
 
-  private prune(map: Map<number, Visual>, seen: Set<number>) {
+  private prune(map: Map<number, Phaser.GameObjects.Image>, seen: Set<number>) {
     for (const [id, img] of map) {
       if (seen.has(id)) continue;
       img.destroy();

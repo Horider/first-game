@@ -18,15 +18,16 @@ function buildQueue(state: GameState, index: number): EnemyType[] {
 }
 
 function spawnGap(state: GameState): number {
-  const [min, max] = ECONOMY.spawnGap;
+  const [min, max] = state.level.spawnGap;
   return min + state.rng() * (max - min);
 }
 
 function spawn(state: GameState, type: EnemyType): void {
   const def = ENEMIES[type];
+  const hp = Math.round(def.hp * state.level.hpScale);
   const row = Math.floor(state.rng() * ROWS);
   const id = newId(state);
-  state.enemies.push({ id, type, row, x: COLS, hp: def.hp, maxHp: def.hp, speed: def.speed, state: 'walk' });
+  state.enemies.push({ id, type, row, x: COLS, hp, maxHp: hp, speed: def.speed, state: 'walk' });
   state.wave.spawned++;
   emit(state, { type: 'enemySpawned', id, enemy: type, row });
 }
