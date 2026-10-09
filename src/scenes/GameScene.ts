@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DEBUG, ROWS, STEP, VIEW } from '../config';
+import { COLS, DEBUG, ROWS, STEP, VIEW } from '../config';
 import { canPlace, collectCoin, placeDefender, setPaused, upgradeDefender } from '../core/commands';
 import { createState, defenderAt, drainEvents, type GameState } from '../core/GameState';
 import { tick } from '../core/Simulation';
@@ -11,6 +11,7 @@ import { recordWin } from '../save/storage';
 import { tinyText } from '../ui/tinyFont';
 import { EntityViews } from '../view/EntityViews';
 import { Hud } from '../view/Hud';
+import { InfoPanel } from '../view/InfoPanel';
 import { cellAt, cellX, rowY } from '../view/layout';
 
 export interface GameSceneData {
@@ -23,6 +24,7 @@ export class GameScene extends Phaser.Scene {
   private state!: GameState;
   private views!: EntityViews;
   private hud!: Hud;
+  private info!: InfoPanel;
   private cursor!: Phaser.GameObjects.Rectangle;
   private debugText?: Phaser.GameObjects.BitmapText;
   private accumulator = 0;
@@ -43,16 +45,30 @@ export class GameScene extends Phaser.Scene {
 
     this.add.image(0, VIEW.panelHeight, 'board').setOrigin(0);
     for (let row = 0; row < ROWS; row++) this.add.image(0, rowY(row), 'wall').setOrigin(0);
+    // Portals glow, each lane out of step with the next.
+    for (let row = 0; row < ROWS; row++) {
+      const glow = this.add
+        .rectangle(cellX(COLS) + VIEW.cell / 2, rowY(row) + VIEW.cell / 2, 12, 20, 0xe7b3ff, 1)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setAlpha(0);
+      this.tweens.add({ targets: glow, alpha: 0.35, duration: 700, delay: row * 180, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
     this.cursor = this.add.rectangle(0, 0, VIEW.cell, VIEW.cell).setOrigin(0).setDepth(5).setVisible(false);
 
-    this.views = new EntityViews(this, (id) => collectCoin(this.state, id));
+    this.views = new EntityViews(
+      this,
+      (id) => collectCoin(this.state, id),
+      (type, pointer) => (this.hud.selected ? this.clickBoard(pointer) : this.info.showEnemy(type)),
+    );
     this.hud = new Hud(
       this,
       `${this.level.id}. ${this.level.name}`,
       (type) => this.selectCard(type),
       () => this.togglePause(),
       (speed) => (this.speed = speed),
+      (type) => (type ? this.info.showDefender(type) : this.syncInfo()),
     );
+    this.info = new InfoPanel(this);
 
     // The board itself: a click places the selected defender. Coins sit above it and win the click.
     const board = this.add
@@ -133,7 +149,14 @@ export class GameScene extends Phaser.Scene {
 
   private selectCard(type: DefenderType | null) {
     this.hud.selected = type && this.hud.selected !== type ? type : null;
+    this.syncInfo();
     this.updateCursor(this.input.activePointer);
+  }
+
+  /** The info panel follows the selected card. */
+  private syncInfo() {
+    if (this.hud.selected) this.info.showDefender(this.hud.selected);
+    else this.info.hide();
   }
 
   private togglePause() {
@@ -157,6 +180,7 @@ export class GameScene extends Phaser.Scene {
     const result = placeDefender(this.state, type, cell.row, cell.col);
     if (result === 'ok') {
       this.hud.selected = null;
+      this.syncInfo();
       this.cursor.setVisible(false);
     } else {
       this.cameras.main.shake(80, 0.01);

@@ -12,6 +12,7 @@ export type GameEvent =
   | { type: 'defenderHit'; id: number }
   | { type: 'defenderDied'; id: number }
   | { type: 'arrowFired'; id: number; from: number }
+  | { type: 'meleeHit'; from: number; target: number }
   | { type: 'coinDropped'; id: number }
   | { type: 'coinCollected'; id: number; value: number; auto: boolean }
   | { type: 'passiveIncome'; value: number }

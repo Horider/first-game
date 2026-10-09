@@ -31,7 +31,10 @@ def outline(tile):
     return out
 
 
-# Enemies walk right to left, so their sprites are mirrored and outlined.
+# The pack draws characters facing left. Defenders are mirrored to face the enemies on the right;
+# enemies already face left, the way they walk, and get an outline.
+# The shield knight already holds his shield on the right, towards the enemies.
+DEFENDERS = {'archer', 'archer2', 'swordsman', 'swordsman2'}
 ENEMIES = {'slime', 'slime-big', 'slimebody', 'slimebody-twins'}
 
 # name: (sheet, cell, skin recolor as (pack colour, only rows above this y) or None)
@@ -66,7 +69,9 @@ for name, (sheet, cell, recolor) in SPRITES.items():
                     tile.putpixel((px, py), (*LIGHT_SKIN, a))
     if name == 'coin':
         tile = tile.crop(tile.getbbox())  # just the coin, 6x5; the game scales it up
+    if name in DEFENDERS:
+        tile = ImageOps.mirror(tile)
     if name in ENEMIES:
-        tile = outline(ImageOps.mirror(tile))
+        tile = outline(tile)
     tile.save(dst / f'{name}.png')
     print(name, tile.getbbox())

@@ -37,6 +37,7 @@ export class Hud {
     onCard: (type: DefenderType) => void,
     onPause: () => void,
     onSpeed: (speed: number) => void,
+    onCardHover: (type: DefenderType | null) => void,
   ) {
     scene.add.rectangle(0, 0, VIEW.width, VIEW.panelHeight, COLORS.panel).setOrigin(0);
 
@@ -50,7 +51,13 @@ export class Hud {
       const price = new PixelText(scene, x + CARD.w / 2, CARD.y + CARD.h - 10, String(DEFENDERS[type].cost)).setOrigin(0.5, 0);
       // Cooldown curtain: drops from the top and shrinks as the card recharges.
       const shade = scene.add.rectangle(x + 1, CARD.y + 1, CARD.w - 2, CARD.h - 2, 0x000000, 0.6).setOrigin(0);
-      scene.add.zone(x, CARD.y, CARD.w, CARD.h).setOrigin(0).setInteractive({ useHandCursor: true }).on('pointerdown', () => onCard(type));
+      scene.add
+        .zone(x, CARD.y, CARD.w, CARD.h)
+        .setOrigin(0)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => onCard(type))
+        .on('pointerover', () => onCardHover(type))
+        .on('pointerout', () => onCardHover(null));
       this.cards.push({ type, x, frame, price, shade });
     });
 

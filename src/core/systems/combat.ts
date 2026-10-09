@@ -39,6 +39,7 @@ export function combatSystem(state: GameState, dt: number): void {
       const target = meleeTarget(state, d, def.range);
       if (!target) continue;
       target.hp -= def.damage;
+      emit(state, { type: 'meleeHit', from: d.id, target: target.id });
       emit(state, { type: 'enemyHit', id: target.id });
     }
     d.attackTimer = def.attackEvery;
