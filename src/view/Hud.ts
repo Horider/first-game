@@ -3,6 +3,7 @@ import { VIEW } from '../config';
 import type { GameState } from '../core/GameState';
 import { CARDS, DEFENDERS, type DefenderType } from '../data/defenders';
 import { PixelText } from '../ui/PixelText';
+import { FRAME } from './anims';
 import { COLORS } from './textures';
 
 const CARD = { x: 4, y: 4, w: 34, h: 48, gap: 3 };
@@ -44,7 +45,10 @@ export class Hud {
     CARDS.forEach((type, i) => {
       const x = CARD.x + i * (CARD.w + CARD.gap);
       const frame = scene.add.graphics();
-      scene.add.image(x + CARD.w / 2, CARD.y + 1, DEFENDERS[type].sprite).setOrigin(0.5, 0);
+      // First idle frame, feet just above the price; the frame's empty margins are cropped to the card.
+      const icon = scene.add.image(x + CARD.w / 2, CARD.y + 35, DEFENDERS[type].sprite, 0);
+      icon.setOrigin(FRAME.footX / FRAME.width, FRAME.footY / FRAME.height);
+      icon.setCrop(FRAME.footX - CARD.w / 2 + 1, FRAME.footY - 34, CARD.w - 2, 34);
       if (type.endsWith('2')) {
         new PixelText(scene, x + 3, CARD.y + 3, '2', { color: '#00ff8c', stroke: '#14141c', strokeThickness: 2 });
       }

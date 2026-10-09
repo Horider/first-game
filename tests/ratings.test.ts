@@ -3,16 +3,17 @@ import { defenderRatings, enemyRatings } from '../src/data/ratings';
 
 describe('ratings', () => {
   it('rank defenders on a 0–10 scale', () => {
-    expect(defenderRatings('swordsman2').power).toBe(10);
-    expect(defenderRatings('shieldbearer')).toEqual({ power: 0, speed: 0, life: 10 });
+    expect(defenderRatings('swordsman3').power).toBe(10);
+    expect(defenderRatings('shieldbearer3')).toEqual({ power: 0, speed: 0, life: 10 });
+    expect(defenderRatings('archer3').power).toBeGreaterThan(defenderRatings('archer2').power);
     expect(defenderRatings('archer2').power).toBeGreaterThan(defenderRatings('archer').power);
     expect(defenderRatings('archer2').life).toBeGreaterThan(defenderRatings('archer').life);
   });
 
-  it('rank slimes: the twins are the strongest, the small slime the weakest', () => {
-    expect(enemyRatings('twins').power).toBe(10);
-    expect(enemyRatings('twins').life).toBe(10);
-    expect(enemyRatings('slime').life).toBeLessThan(enemyRatings('bigSlime').life);
-    expect(enemyRatings('slime').speed).toBe(10);
+  it('rank orcs: the shaman is the strongest, the raider the weakest', () => {
+    expect(enemyRatings('shaman').power).toBe(10);
+    expect(enemyRatings('shaman').life).toBe(10);
+    expect(enemyRatings('raider').life).toBeLessThan(enemyRatings('hunter').life);
+    expect(enemyRatings('raider').speed).toBe(10);
   });
 });

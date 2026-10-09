@@ -14,6 +14,9 @@ function score(value: number, max: number): number {
   return Math.ceil((value / max) * 10 - 1e-9);
 }
 
+/** Health spans 60 to 950, so it is scored on a square-root curve to keep archers off zero. */
+const lifeScore = (hp: number, max: number) => score(Math.sqrt(hp), Math.sqrt(max));
+
 const defenderTypes = Object.keys(DEFENDERS) as DefenderType[];
 const enemyTypes = Object.keys(ENEMIES) as EnemyType[];
 const attacksPerSecond = (t: DefenderType) => (DEFENDERS[t].attackEvery > 0 ? 1 / DEFENDERS[t].attackEvery : 0);
@@ -24,16 +27,16 @@ export function defenderRatings(type: DefenderType): Ratings {
   return {
     power: score(DEFENDERS[type].damage, max((t) => DEFENDERS[t].damage)),
     speed: score(attacksPerSecond(type), max(attacksPerSecond)),
-    life: score(DEFENDERS[type].hp, max((t) => DEFENDERS[t].hp)),
+    life: lifeScore(DEFENDERS[type].hp, max((t) => DEFENDERS[t].hp)),
   };
 }
 
-/** Slimes: power = damage per second, speed = walking speed, life = base health. */
+/** Orcs: power = damage per second, speed = walking speed, life = base health. */
 export function enemyRatings(type: EnemyType): Ratings {
   const max = (f: (t: EnemyType) => number) => Math.max(...enemyTypes.map(f));
   return {
     power: score(ENEMIES[type].dps, max((t) => ENEMIES[t].dps)),
     speed: score(ENEMIES[type].speed, max((t) => ENEMIES[t].speed)),
-    life: score(ENEMIES[type].hp, max((t) => ENEMIES[t].hp)),
+    life: lifeScore(ENEMIES[type].hp, max((t) => ENEMIES[t].hp)),
   };
 }

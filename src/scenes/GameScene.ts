@@ -58,7 +58,7 @@ export class GameScene extends Phaser.Scene {
     this.views = new EntityViews(
       this,
       (id) => collectCoin(this.state, id),
-      (type, pointer) => (this.hud.selected ? this.clickBoard(pointer) : this.info.showEnemy(type)),
+      (type, pointer) => (this.hud.selected ? this.clickBoard(pointer) : this.info.showEnemy(type, this.level.orcTier)),
     );
     this.hud = new Hud(
       this,
@@ -106,7 +106,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.handleEvents();
-    this.views.sync(this.state, time);
+    this.views.sync(this.state, time, this.speed);
     this.hud.sync(this.state, this.speed);
     if (this.debugText) {
       const w = this.state.wave;
@@ -172,7 +172,7 @@ export class GameScene extends Phaser.Scene {
     const cell = cellAt(p.worldX, p.worldY);
     if (!cell) return;
     if (!type) {
-      // No card in hand: clicking a level-1 defender upgrades it.
+      // No card in hand: clicking a defender upgrades it to the next level.
       const d = defenderAt(this.state, cell.row, cell.col);
       if (d && upgradeDefender(this.state, d.id) === 'noCoins') this.cameras.main.shake(80, 0.005);
       return;

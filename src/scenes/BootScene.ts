@@ -1,12 +1,10 @@
 import Phaser from 'phaser';
 import { FONT } from '../ui/PixelText';
 import { createTinyFont } from '../ui/tinyFont';
+import { characterKeys, createAnims, FRAME } from '../view/anims';
 import { createTextures } from '../view/textures';
 
-const SPRITES = [
-  'archer', 'archer2', 'swordsman', 'swordsman2', 'shieldbearer',
-  'slime', 'slime-big', 'slimebody', 'slimebody-twins', 'coin', 'wall', 'heart',
-];
+const SPRITES = ['coin', 'wall', 'heart'];
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -16,10 +14,14 @@ export class BootScene extends Phaser.Scene {
   preload() {
     const base = `${import.meta.env.BASE_URL}assets/sprites/`;
     for (const key of SPRITES) this.load.image(key, `${base}${key}.png`);
+    for (const key of characterKeys()) {
+      this.load.spritesheet(key, `${base}${key}.png`, { frameWidth: FRAME.width, frameHeight: FRAME.height });
+    }
   }
 
   async create() {
     createTextures(this);
+    createAnims(this);
     createTinyFont(this);
     // Canvas text only uses a web font once it is loaded; wait so the first labels are right.
     try {

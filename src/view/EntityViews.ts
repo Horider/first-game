@@ -5,6 +5,7 @@ import type { GameEvent } from '../core/events';
 import type { GameState } from '../core/GameState';
 import { DEFENDERS } from '../data/defenders';
 import { ENEMIES, type EnemyType } from '../data/enemies';
+import { clipKey, FRAME } from './anims';
 import { cellX, PURSE, rowY } from './layout';
 
 const DEPTH = { defender: 10, enemy: 20, arrow: 30, bars: 40, coin: 50 };
@@ -18,17 +19,16 @@ interface Pose {
 }
 
 interface Unit {
-  img: Phaser.GameObjects.Image;
+  img: Phaser.GameObjects.Sprite;
+  /** Sprite sheet the unit currently uses (changes when a defender is upgraded). */
+  key: string;
   pose: Pose;
 }
 
-/** Slime bodies with legs wobble side to side; round slimes squash and stretch instead. */
-const LEGGED = new Set<EnemyType>(['slimebody', 'twins']);
-
 /**
- * Keeps one sprite per defender, slime, arrow and coin in step with the game state, and
- * animates them: idle breathing, walking, attacks, hits, deaths. The 32rogues sprites have a
- * single frame, so all motion is done with position, scale and rotation.
+ * Keeps one sprite per defender, orc, arrow and coin in step with the game state, and
+ * animates them. Characters play their sheet clips (idle, run, attack); hits, spawns,
+ * upgrades and deaths add small position and scale tweens on top.
  */
 export class EntityViews {
   private defenders = new Map<number, Unit>();
@@ -59,32 +59,30 @@ export class EntityViews {
         case 'defenderUpgraded': {
           const unit = this.defenders.get(ev.id);
           if (!unit) break;
-          unit.img.setTexture(DEFENDERS[ev.defender].sprite).setTintFill(0x00ff8c);
+          unit.key = DEFENDERS[ev.defender].sprite;
+          unit.img.play(clipKey(unit.key, 'idle')).setTintFill(0x00ff8c);
           this.scene.tweens.add({ targets: unit.pose, squash: -0.25, duration: 120, yoyo: true, onComplete: () => unit.img.clearTint() });
           break;
         }
         case 'enemyHit': {
           const unit = this.enemies.get(ev.id);
           this.flash(unit?.img, ev.id, 0.08);
-          // Knock the slime back a little.
+          // Knock the orc back a little.
           if (unit) this.pulse(unit.pose, { dx: 3 }, 70);
           break;
         }
         case 'defenderHit': {
           const unit = this.defenders.get(ev.id);
-          if (this.flash(unit?.img, ev.id, 0.08, 0.5) && unit) this.pulse(unit.pose, { dx: -2 }, 60);
+          if (!this.flash(unit?.img, ev.id, 0.08, 0.5) || !unit) break;
+          // Shieldbearers raise the shield; everyone else just flinches.
+          if (DEFENDERS[this.typeOf(unit)]?.damage === 0) this.act(unit);
+          else this.pulse(unit.pose, { dx: -2 }, 60);
           break;
         }
-        case 'arrowFired': {
-          // Draw the bow: lean back, then spring forward.
-          const unit = this.defenders.get(ev.from);
-          if (unit) this.pulse(unit.pose, { dx: -3, squash: 0.08 }, 80);
-          break;
-        }
+        case 'arrowFired':
         case 'meleeHit': {
-          // Lunge and swing towards the slime.
           const unit = this.defenders.get(ev.from);
-          if (unit) this.pulse(unit.pose, { dx: 7, angle: 12 }, 90);
+          if (unit) this.act(unit, true);
           break;
         }
         case 'coinCollected': {
@@ -109,23 +107,28 @@ export class EntityViews {
     }
   }
 
-  sync(state: GameState, time: number) {
+  /** `speed` is the game speed; clips play faster with it and stop while the game is paused. */
+  sync(state: GameState, time: number, speed: number) {
     const seen = new Set<number>();
     const t = time / 1000;
+    const clipSpeed = state.status === 'paused' ? 0 : speed;
 
     for (const d of state.defenders) {
       seen.add(d.id);
       let unit = this.defenders.get(d.id);
       if (!unit) {
-        const img = this.scene.add.image(0, 0, DEFENDERS[d.type].sprite).setOrigin(0.5, 1).setDepth(DEPTH.defender + d.row);
-        unit = { img, pose: { dx: 0, angle: 0, squash: -0.7 } };
+        const key = DEFENDERS[d.type].sprite;
+        const img = this.character(key).setDepth(DEPTH.defender + d.row);
+        unit = { img, key, pose: { dx: 0, angle: 0, squash: -0.7 } };
+        img.play({ key: clipKey(key, 'idle'), startFrame: d.id % 4 }); // out of step with the others
+        // After an attack, back to idle.
+        img.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => img.play(clipKey(unit!.key, 'idle')));
         // Pop up out of the ground.
         this.scene.tweens.add({ targets: unit.pose, squash: 0, duration: 200, ease: 'Back.easeOut' });
         this.defenders.set(d.id, unit);
       }
-      // Idle: slow breathing, each defender a little out of step with the others.
-      const breath = Math.sin(t * 2.4 + d.id) * 0.03;
-      this.place(unit, cellX(d.col) + HALF, rowY(d.row) + VIEW.cell, breath);
+      unit.img.anims.timeScale = clipSpeed;
+      this.place(unit, cellX(d.col) + HALF, rowY(d.row) + VIEW.cell);
 
       // A green arrow over level-1 defenders the player can afford to upgrade.
       const upgradable = canUpgrade(state, d.id) === 'ok';
@@ -147,29 +150,21 @@ export class EntityViews {
       seen.add(e.id);
       let unit = this.enemies.get(e.id);
       if (!unit) {
-        const img = this.scene.add.image(0, 0, ENEMIES[e.type].sprite).setOrigin(0.5, 1).setDepth(DEPTH.enemy + e.row);
-        img.setInteractive().on('pointerdown', (p: Phaser.Input.Pointer) => this.onEnemyClick(e.type, p));
-        unit = { img, pose: { dx: 0, angle: 0, squash: 0 } };
+        // Later levels send the same orcs in heavier armour.
+        const key = `${ENEMIES[e.type].sprite}${state.level.orcTier}`;
+        const img = this.character(key).setDepth(DEPTH.enemy + e.row);
+        img.setInteractive(new Phaser.Geom.Rectangle(12, 6, 24, 32), Phaser.Geom.Rectangle.Contains);
+        img.on('pointerdown', (p: Phaser.Input.Pointer) => this.onEnemyClick(e.type, p));
+        unit = { img, key, pose: { dx: 0, angle: 0, squash: 0 } };
         this.enemies.set(e.id, unit);
       }
-      const phase = t * (e.state === 'walk' ? 6 : 9) + e.id;
-      let y = rowY(e.row) + VIEW.cell;
-      let squash = 0;
-      let angle = 0;
-      let dx = 0;
-      if (LEGGED.has(e.type)) {
-        // Waddle: tilt from side to side, step up on each foot.
-        angle = Math.sin(phase) * (e.state === 'walk' ? 6 : 3);
-        y -= Math.abs(Math.sin(phase)) * 2;
-        if (e.state === 'attack') dx = -Math.max(0, Math.sin(phase)) * 4; // punching the defender
-      } else {
-        // Jelly: squash on landing, stretch while hopping.
-        squash = Math.sin(phase) * (e.state === 'walk' ? 0.12 : 0.18);
-        if (e.state === 'walk') y -= Math.max(0, Math.sin(phase)) * 3;
-        else dx = -Math.max(0, Math.sin(phase)) * 3; // gnawing at the defender
-      }
-      unit.img.setAlpha(Math.min(1, Math.max(0.3, (9.6 - e.x) / 0.6))); // fade in from the portal
-      this.place(unit, Math.round(cellX(e.x)) + HALF + dx, y, squash, angle);
+      // Run along the lane; swing again and again while something blocks the way.
+      const img = unit.img;
+      img.anims.timeScale = clipSpeed;
+      if (e.state === 'walk') img.play(clipKey(unit.key, 'run'), true);
+      else if (!img.anims.isPlaying || img.anims.getName() !== clipKey(unit.key, 'act')) img.play(clipKey(unit.key, 'act'));
+      img.setAlpha(Math.min(1, Math.max(0.3, (9.6 - e.x) / 0.6))); // fade in from the portal
+      this.place(unit, Math.round(cellX(e.x)) + HALF, rowY(e.row) + VIEW.cell);
     }
     this.pruneUnits(this.enemies, seen);
 
@@ -207,7 +202,23 @@ export class EntityViews {
     this.updateFlashes(time);
   }
 
-  /** Apply base motion plus the event pose; feet stay on the ground while squashing. */
+  /** A character sprite anchored at its feet. */
+  private character(key: string) {
+    return this.scene.add.sprite(0, 0, key).setOrigin(FRAME.footX / FRAME.width, FRAME.footY / FRAME.height);
+  }
+
+  private typeOf(unit: Unit) {
+    return (Object.keys(DEFENDERS) as (keyof typeof DEFENDERS)[]).find((t) => DEFENDERS[t].sprite === unit.key)!;
+  }
+
+  /** Play the class action once (shot, sword swing, shield block). `restart` cuts a running one short. */
+  private act(unit: Unit, restart = false) {
+    const key = clipKey(unit.key, 'act');
+    if (!restart && unit.img.anims.getName() === key && unit.img.anims.isPlaying) return;
+    unit.img.play(key);
+  }
+
+  /** Apply the event pose; feet stay on the ground while squashing. */
   private place(unit: Unit, x: number, y: number, squash = 0, angle = 0) {
     const s = squash + unit.pose.squash;
     unit.img
@@ -238,7 +249,7 @@ export class EntityViews {
   }
 
   /** White hit flash; returns false when the unit flashed too recently. */
-  private flash(img: Phaser.GameObjects.Image | undefined, id: number, seconds: number, minGap = 0): boolean {
+  private flash(img: Phaser.GameObjects.Sprite | undefined, id: number, seconds: number, minGap = 0): boolean {
     if (!img) return false;
     const now = this.scene.time.now;
     const until = this.flashUntil.get(id) ?? 0;
@@ -257,22 +268,24 @@ export class EntityViews {
     }
   }
 
-  /** Death: flash, flatten into a puddle and fade, with a few droplets for slimes. */
+  /** Death: flash, fall flat and fade, kicking up a little dust. */
   private vanish(map: Map<number, Unit>, id: number) {
     const unit = map.get(id);
     if (!unit) return;
     map.delete(id);
     const img = unit.img.disableInteractive();
+    img.removeAllListeners(Phaser.Animations.Events.ANIMATION_COMPLETE);
+    img.anims.pause();
     this.scene.tweens.killTweensOf(unit.pose);
     img.setTintFill(0xffffff);
     this.scene.time.delayedCall(80, () => img.clearTint());
     this.scene.tweens.add({ targets: img, scaleX: 1.5, scaleY: 0.25, angle: 0, alpha: 0, duration: 320, onComplete: () => img.destroy() });
-    if (map === this.enemies) this.splash(img.x, img.y - 6);
+    this.dust(img.x, img.y - 4);
   }
 
-  private splash(x: number, y: number) {
+  private dust(x: number, y: number) {
     for (let i = 0; i < 6; i++) {
-      const drop = this.scene.add.image(x, y, 'pixel').setDisplaySize(2, 2).setTint(0x82a368).setDepth(DEPTH.arrow);
+      const drop = this.scene.add.image(x, y, 'pixel').setDisplaySize(2, 2).setTint(0x8a7a66).setDepth(DEPTH.arrow);
       const angle = Math.PI * (1.15 + (i / 5) * 0.7); // fan upwards
       this.scene.tweens.add({
         targets: drop,

@@ -2,12 +2,12 @@ import { STEP } from '../src/config';
 import { canPlace, canUpgrade, placeDefender, upgradeDefender } from '../src/core/commands';
 import { createState, defenderAt, type GameState } from '../src/core/GameState';
 import { tick } from '../src/core/Simulation';
-import type { DefenderType } from '../src/data/defenders';
+import { DEFENDERS, type DefenderType } from '../src/data/defenders';
 import { LEVELS } from '../src/data/levels';
 
 /**
  * A simple greedy player used to check balance: first an archer on every threatened lane,
- * then a shieldbearer in front, a swordsman behind it, upgrades and more archers.
+ * then a shieldbearer in front, a swordsman behind it, attacker upgrades and more archers.
  * It never clicks coins, so a human who does is a little richer.
  */
 function decide(s: GameState) {
@@ -22,7 +22,7 @@ function decide(s: GameState) {
   const lanes = [0, 1, 2, 3, 4].sort((a, b) => threat(b) - threat(a));
   // Cover every lane first; while the archer card recharges, buy the level-2 one or save up.
   for (const row of lanes) {
-    if (count(row, 'archer', 'archer2') > 0) continue;
+    if (count(row, 'archer', 'archer2', 'archer3') > 0) continue;
     place('archer', row, 0) || place('archer2', row, 0);
     return;
   }
@@ -31,7 +31,10 @@ function decide(s: GameState) {
     if (!defenderAt(s, row, 4) && place('shieldbearer', row, 4)) return;
     if (!defenderAt(s, row, 3) && place('swordsman', row, 3)) return;
   }
-  for (const d of s.defenders) if (canUpgrade(s, d.id) === 'ok') return void upgradeDefender(s, d.id);
+  // Upgrade archers and swordsmen; thicker shields are not worth it for this bot.
+  for (const d of s.defenders) {
+    if (DEFENDERS[d.type].damage > 0 && canUpgrade(s, d.id) === 'ok') return void upgradeDefender(s, d.id);
+  }
   for (const row of lanes) {
     for (const col of [1, 2]) if (!defenderAt(s, row, col) && place('archer2', row, col)) return;
   }

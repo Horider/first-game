@@ -1,20 +1,21 @@
-export type EnemyType = 'slime' | 'bigSlime' | 'slimebody' | 'twins';
+export type EnemyType = 'raider' | 'hunter' | 'bulwark' | 'shaman';
 
 export interface EnemyDef {
   name: string;
   hp: number;
-  /** Damage per second to the defender it is chewing on. */
+  /** Damage per second to the defender it is fighting. */
   dps: number;
   /** Cells per second. */
   speed: number;
   reward: number;
+  /** Sprite key without the armour tier: 'orc-raider' + 1..3. */
   sprite: string;
 }
 
-/** Slimes from the 32rogues pack, weakest to strongest. */
+/** Orcs, weakest to strongest. */
 export const ENEMIES = {
-  slime: { name: 'Капелька', hp: 60, dps: 12, speed: 0.45, reward: 10, sprite: 'slime' },
-  bigSlime: { name: 'Большая капля', hp: 130, dps: 20, speed: 0.3, reward: 20, sprite: 'slime-big' },
-  slimebody: { name: 'Слизень', hp: 240, dps: 32, speed: 0.4, reward: 35, sprite: 'slimebody' },
-  twins: { name: 'Двойной слизень', hp: 480, dps: 50, speed: 0.25, reward: 60, sprite: 'slimebody-twins' },
+  raider: { name: 'Орк-рубака', hp: 60, dps: 12, speed: 0.45, reward: 10, sprite: 'orc-raider' },
+  hunter: { name: 'Орк-охотник', hp: 130, dps: 20, speed: 0.3, reward: 20, sprite: 'orc-hunter' },
+  bulwark: { name: 'Орк-громила', hp: 240, dps: 32, speed: 0.4, reward: 35, sprite: 'orc-bulwark' },
+  shaman: { name: 'Орк-шаман', hp: 480, dps: 50, speed: 0.25, reward: 60, sprite: 'orc-shaman' },
 } satisfies Record<EnemyType, EnemyDef>;

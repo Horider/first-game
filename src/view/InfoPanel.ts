@@ -4,6 +4,7 @@ import { DEFENDERS, type DefenderType } from '../data/defenders';
 import { ENEMIES, type EnemyType } from '../data/enemies';
 import { defenderRatings, enemyRatings, type Ratings } from '../data/ratings';
 import { PixelText } from '../ui/PixelText';
+import { clipKey, FRAME } from './anims';
 
 const W = 172;
 const H = 68;
@@ -15,10 +16,10 @@ const ROWS: [keyof Ratings, string, number][] = [
   ['life', 'Жизнь', 0x5fe05a],
 ];
 
-/** Name, a short note and power / speed / life as 10 pips each, for a defender card or a slime. */
+/** Name, a short note and power / speed / life as 10 pips each, for a defender card or an orc. */
 export class InfoPanel {
   private root: Phaser.GameObjects.Container;
-  private icon: Phaser.GameObjects.Image;
+  private icon: Phaser.GameObjects.Sprite;
   private title: PixelText;
   private note: PixelText;
   private pips: Phaser.GameObjects.Graphics;
@@ -27,7 +28,8 @@ export class InfoPanel {
 
   constructor(private scene: Phaser.Scene) {
     const bg = scene.add.rectangle(0, 0, W, H, 0x14141c).setOrigin(0).setStrokeStyle(1, 0x55556e);
-    this.icon = scene.add.image(4, 4, 'archer').setOrigin(0);
+    // Feet near the panel's middle; the head may poke a little over its top edge.
+    this.icon = scene.add.sprite(20, 32, 'archer').setOrigin(FRAME.footX / FRAME.width, FRAME.footY / FRAME.height);
     this.title = new PixelText(scene, 40, 6, '');
     this.note = new PixelText(scene, 40, 18, '', { color: '#a0a0b8' });
     this.pips = scene.add.graphics();
@@ -45,10 +47,10 @@ export class InfoPanel {
     this.show(def.sprite, def.name, reach, defenderRatings(type));
   }
 
-  showEnemy(type: EnemyType) {
+  showEnemy(type: EnemyType, tier: number) {
     const def = ENEMIES[type];
-    this.show(def.sprite, def.name, `награда ${def.reward}`, enemyRatings(type));
-    // A slime's card closes by itself; a defender card stays while it is selected.
+    this.show(`${def.sprite}${tier}`, def.name, `награда ${def.reward}`, enemyRatings(type));
+    // An orc's card closes by itself; a defender card stays while it is selected.
     this.hideTimer = this.scene.time.delayedCall(3000, () => this.hide());
   }
 
@@ -59,7 +61,7 @@ export class InfoPanel {
 
   private show(sprite: string, name: string, note: string, r: Ratings) {
     this.hideTimer?.remove();
-    this.icon.setTexture(sprite);
+    this.icon.play(clipKey(sprite, 'idle'));
     this.title.setText(name);
     this.note.setText(note);
     const g = this.pips.clear();

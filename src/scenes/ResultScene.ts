@@ -33,7 +33,7 @@ export class ResultScene extends Phaser.Scene {
         this.tweens.add({ targets: star, scale: 2, delay: 200 + i * 200, duration: 200, ease: 'Back.easeOut' });
       }
     } else {
-      new PixelText(this, cx, 80, 'Капли прорвались к лагерю', { color: '#c8c8d8' }).setOrigin(0.5);
+      new PixelText(this, cx, 80, 'Орки прорвались к лагерю', { color: '#c8c8d8' }).setOrigin(0.5);
     }
 
     const next = LEVELS.find((l) => l.id === levelId + 1);

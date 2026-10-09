@@ -66,7 +66,7 @@ describe('coins', () => {
     expect(s.drops).toHaveLength(1);
     run(s, 0.2);
     expect(s.drops).toHaveLength(0);
-    expect(s.coins).toBe(LEVELS[0].startCoins + ENEMIES.slime.reward);
+    expect(s.coins).toBe(LEVELS[0].startCoins + ENEMIES.raider.reward);
   });
 
   it('pays passive income on a timer', () => {

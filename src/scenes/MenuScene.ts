@@ -3,6 +3,7 @@ import { VIEW } from '../config';
 import { LEVELS } from '../data/levels';
 import { isUnlocked, loadSave } from '../save/storage';
 import { button } from '../ui/Button';
+import { clipKey, FRAME } from '../view/anims';
 import { PixelText } from '../ui/PixelText';
 
 /** Title and level select: each level opens once the previous one is won. */
@@ -16,9 +17,10 @@ export class MenuScene extends Phaser.Scene {
     const cx = VIEW.width / 2;
     const save = loadSave();
 
-    this.add.image(cx - 70, 30, 'slime-big').setScale(1);
-    this.add.image(cx + 70, 30, 'archer');
-    new PixelText(this, cx, 30, 'Капли', {
+    // An archer and an orc face each other across the title.
+    this.add.sprite(cx - 70, 40, 'archer').setOrigin(0.5, FRAME.footY / FRAME.height).play(clipKey('archer', 'idle'));
+    this.add.sprite(cx + 70, 40, 'orc-raider1').setOrigin(0.5, FRAME.footY / FRAME.height).play(clipKey('orc-raider1', 'idle'));
+    new PixelText(this, cx, 30, 'Орки', {
       fontSize: '16px',
       color: '#e6b422',
       stroke: '#14141c',
